@@ -125,18 +125,55 @@ class MobileData
 		return buttonsInstance;
 	}
 
+	// FIX: The original code used `#if MODS_ALLOWED if (FileSystem.exists(folder)) #end`
+	// which silently blocked ALL asset loading on Android. On Android, assets packed
+	// inside the APK are not accessible via FileSystem.exists() for relative paths —
+	// they live inside the APK bundle. Since MODS_ALLOWED is defined for mobile targets
+	// (see Project.xml), the guard would always fail for shared asset paths like
+	// "assets/shared/mobile/DPadModes", leaving dpadModes and actionModes empty.
+	// This caused the touch controls to not load any layout.
+	//
+	// Fix: split the guard — on Android only check FileSystem.exists for absolute
+	// paths (i.e. real external-storage mod folders). For relative APK paths, skip
+	// the guard and let Paths.readDirectory() (which is also fixed) do the right thing.
 	public static function readDirectory(folder:String, map:Dynamic)
 	{
 		folder = folder.contains(':') ? folder.split(':')[1] : folder;
 
-		#if MODS_ALLOWED if (FileSystem.exists(folder)) #end
+		// Determine whether we should guard with FileSystem.exists().
+		// On Android, relative paths are inside the APK and FileSystem.exists()
+		// returns false for them even when the folder is valid.
+		var shouldRead:Bool = true;
+		#if MODS_ALLOWED
+		#if android
+		// Only guard with FileSystem when the path is absolute (external storage / mods).
+		// Relative paths go through the APK bundle and are always readable.
+		if (haxe.io.Path.isAbsolute(folder))
+			shouldRead = FileSystem.exists(folder);
+		// else: relative path → APK asset → always attempt to read
+		#else
+		shouldRead = FileSystem.exists(folder);
+		#end
+		#end
+
+		if (!shouldRead) return;
+
 		for (file in Paths.readDirectory(folder))
 		{
 			var fileWithNoLib:String = file.contains(':') ? file.split(':')[1] : file;
 			if (Path.extension(fileWithNoLib) == 'json')
 			{
 				file = Path.join([folder, Path.withoutDirectory(file)]);
-				var str = #if MODS_ALLOWED File.getContent(file) #else Assets.getText(file) #end;
+				var str:String;
+				#if MODS_ALLOWED
+				// On Android, absolute paths are real files; relative paths are APK assets.
+				if (haxe.io.Path.isAbsolute(file))
+					str = File.getContent(file);
+				else
+					str = Assets.getText(file);
+				#else
+				str = Assets.getText(file);
+				#end
 				var json:TouchButtonsData = cast Json.parse(str);
 				var mapKey:String = Path.withoutDirectory(Path.withoutExtension(fileWithNoLib));
 				map.set(mapKey, json);
