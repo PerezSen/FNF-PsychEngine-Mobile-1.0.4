@@ -108,22 +108,36 @@ class ModsMenuState extends MusicBeatState
 		else
 			daY = 20;
 
+		// ── RELOAD ──
 		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + daY, buttonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), reload);
 		add(buttonReload);
 		
-		var myY = buttonReload.y + buttonReload.bg.height + 20;
-		/*buttonModFolder = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, "MODS FOLDER", function() {
-			var modFolder = Paths.mods();
-			if(!FileSystem.exists(modFolder))
+		// ── DISABLE ALL (fijo debajo de Reload, siempre rojo) ──
+		var disableY = buttonReload.y + buttonReload.bg.height + 20;
+		buttonDisableAll = new MenuButton(buttonX, disableY, buttonWidth, buttonHeight, Language.getPhrase('disable_all_button', 'DISABLE ALL'), function() {
+			buttonDisableAll.ignoreCheck = false;
+			for (mod in modsGroup.members)
 			{
-				trace('created missing folder');
-				FileSystem.createDirectory(modFolder);
+				if(modsList.enabled.contains(mod.folder))
+				{
+					modsList.enabled.remove(mod.folder);
+					modsList.disabled.push(mod.folder);
+					mod.icon.color = 0xFFFF6666;
+					mod.text.color = FlxColor.GRAY;
+				}
 			}
-			CoolUtil.openFolder(modFolder);
+			updateModDisplayData();
+			checkToggleButtons();
+			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		});
-		add(buttonModFolder);*/
+		buttonDisableAll.bg.color = 0xFFFF6666;
+		buttonDisableAll.focusChangeCallback = function(focus:Bool) if(!focus) buttonDisableAll.bg.color = 0xFFFF6666;
+		if(!controls.mobileC)
+			add(buttonDisableAll);
 
-		buttonEnableAll = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, Language.getPhrase('enable_all_button', 'ENABLE ALL'), function() {
+		// ── ENABLE ALL (debajo de Disable All) ──
+		var enableY = disableY + buttonHeight + 20;
+		buttonEnableAll = new MenuButton(buttonX, enableY, buttonWidth, buttonHeight, Language.getPhrase('enable_all_button', 'ENABLE ALL'), function() {
 			buttonEnableAll.ignoreCheck = false;
 			for (mod in modsGroup.members)
 			{
@@ -144,32 +158,12 @@ class ModsMenuState extends MusicBeatState
 		if(!controls.mobileC)
 			add(buttonEnableAll);
 
-		buttonDisableAll = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, Language.getPhrase('disable_all_button', 'DISABLE ALL'), function() {
-			buttonDisableAll.ignoreCheck = false;
-			for (mod in modsGroup.members)
-			{
-				if(modsList.enabled.contains(mod.folder))
-				{
-					modsList.enabled.remove(mod.folder);
-					modsList.disabled.push(mod.folder);
-					mod.icon.color = 0xFFFF6666;
-					mod.text.color = FlxColor.GRAY;
-				}
-			}
-			updateModDisplayData();
-			checkToggleButtons();
-			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
-		});
-		buttonDisableAll.bg.color = 0xFFFF6666;
-		buttonDisableAll.focusChangeCallback = function(focus:Bool) if(!focus) buttonDisableAll.bg.color = 0xFFFF6666;
-		if(!controls.mobileC)
-			add(buttonDisableAll);
 		checkToggleButtons();
 
 		if(modsList.all.length < 1)
 		{
 			buttonDisableAll.visible = buttonDisableAll.enabled = false;
-			buttonEnableAll.visible = true;
+			buttonEnableAll.visible = buttonEnableAll.enabled = false;
 
 			var myX = bgList.x + bgList.width + 20;
 			noModsTxt = new FlxText(myX, 0, FlxG.width - myX - 20, Language.getPhrase('no_mods_installed', "NO MODS INSTALLED\nPRESS {1} TO EXIT OR INSTALL A MOD", [daButton]), 48);
@@ -502,7 +496,7 @@ class ModsMenuState extends MusicBeatState
 						changeSelectedButton();
 					}
 				}
-				else 
+				else 
 				{
 					if(controls.BACK)
 					{
@@ -639,40 +633,13 @@ class ModsMenuState extends MusicBeatState
 			button.ignoreCheck = button.onFocus = false;
 		}
 
-		var lastSelected = curSelectedMod;
 		curSelectedMod += add;
 
-		var limited:Bool = false;
+		// ── Navegación circular ──
 		if(curSelectedMod < 0)
-		{
-			curSelectedMod = 0;
-			limited = true;
-		}
+			curSelectedMod = max;       // Sube desde el primero → va al último
 		else if(curSelectedMod > max)
-		{
-			curSelectedMod = max;
-			limited = true;
-		}
-		
-		if(!controls.mobileC && !isMouseWheel && limited && Math.abs(add) == 1)
-		{
-			if(add < 0) // pressed up on first mod
-			{
-				curSelectedMod = lastSelected;
-				hoveringOnMods = false;
-				curSelectedButton = -1;
-				changeSelectedButton();
-				return;
-			}
-			else // pressed down on last mod
-			{
-				curSelectedMod = lastSelected;
-				hoveringOnMods = false;
-				curSelectedButton = -2;
-				changeSelectedButton();
-				return;
-			}
-		}
+			curSelectedMod = 0;         // Baja desde el último → va al primero
 		
 		holdingMod = false;
 		holdingElapsed = 0;
@@ -784,10 +751,11 @@ class ModsMenuState extends MusicBeatState
 		FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 	}
 
+	// ── Ambos botones visibles según estado actual ──
 	function checkToggleButtons()
 	{
-		buttonEnableAll.visible = buttonEnableAll.enabled = buttonEnableAll.active = modsList.disabled.length > 0;
-		buttonDisableAll.visible = buttonDisableAll.enabled = buttonDisableAll.active = !buttonEnableAll.visible;
+		buttonEnableAll.visible  = buttonEnableAll.enabled  = buttonEnableAll.active  = modsList.disabled.length > 0;
+		buttonDisableAll.visible = buttonDisableAll.enabled = buttonDisableAll.active = modsList.enabled.length > 0;
 	}
 
 	function reload()
@@ -906,8 +874,8 @@ class ModItem extends FlxSpriteGroup
 			if(pack.color != null)
 			{
 				this.bgColor = FlxColor.fromRGB(pack.color[0] != null ? pack.color[0] : 170,
-											  pack.color[1] != null ? pack.color[1] : 0,
-											  pack.color[2] != null ? pack.color[2] : 255);
+											  pack.color[1] != null ? pack.color[1] : 0,
+											  pack.color[2] != null ? pack.color[2] : 255);
 			}
 			this.mustRestart = (pack.restart == true);
 		}
