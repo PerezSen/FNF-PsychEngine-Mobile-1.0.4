@@ -97,8 +97,9 @@ class ABotSpeaker extends FlxSpriteGroup
 		for (i in 0...Std.int(Math.min(vizSprites.length, levels.length)))
 		{
 			var animFrame:Int = Math.round(levels[i].value * 5);
+			vizSprites[i].visible = animFrame > 0;
+			
 			animFrame = Std.int(Math.abs(FlxMath.bound(animFrame, 0, 5) - 5)); // shitty dumbass flip, cuz dave got da shit backwards lol!
-		
 			vizSprites[i].animation.curAnim.curFrame = animFrame;
 			levelMax = Std.int(Math.max(levelMax, 5 - animFrame));
 		}
@@ -122,7 +123,13 @@ class ABotSpeaker extends FlxSpriteGroup
 	{
 		@:privateAccess
 		analyzer = new SpectralAnalyzer(snd._channel.__audioSource, 7, 0.1, 40);
-	
+		
+		// A-Bot tuning...
+	    analyzer.minDb = -65;
+	    analyzer.maxDb = -25;
+	    analyzer.maxFreq = 22000;
+	    analyzer.minFreq = 10;
+		
 		#if !web
 		// On native it uses FFT stuff that isn't as optimized as the direct browser stuff we use on HTML5
 		// So we want to manually change it!
