@@ -205,27 +205,30 @@ function createHintGraphic(Width:Int, Height:Int, ?isLane:Bool = false):FlxGraph
 	{
 		var shape:Shape = new Shape();
 		
+		// NUEVA OPCIÓN: Hitbox Line
 		if (ClientPrefs.data.hitboxType == "Hitbox Line")
 		{
 			if (!isLane)
 			{
-				var lineHeight:Float = Height * 0.035; 
+				
+				var lineHeight:Float = Height * 0.0175; 
 				var glowHeight:Float = lineHeight * 4; 
 				
+				
 				var matrix:Matrix = new Matrix();
-	
 				matrix.createGradientBox(Width, glowHeight, Math.PI / 2, 0, Height - glowHeight);
 				
 				shape.graphics.beginGradientFill(LINEAR, [0xFFFFFF, 0xFFFFFF], [0, 1], [0, 255], matrix);
 				shape.graphics.drawRect(0, Height - glowHeight, Width, glowHeight);
 				shape.graphics.endFill();
 
+				
 				shape.graphics.beginFill(0xFFFFFF);
 				shape.graphics.drawRect(0, Height - lineHeight, Width, lineHeight);
 				shape.graphics.endFill();
 			}
 		}
-		// LAS OPCIONES ORIGINALES SE MANTIENEN IGUAL
+		
 		else if (ClientPrefs.data.hitboxType == "No Gradient")
 		{
 			var matrix:Matrix = new Matrix();
