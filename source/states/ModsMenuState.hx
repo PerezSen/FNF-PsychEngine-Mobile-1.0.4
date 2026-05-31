@@ -29,6 +29,9 @@ class ModsMenuState extends MusicBeatState
 	//var buttonModFolder:MenuButton;
 	var buttonEnableAll:MenuButton;
 	var buttonDisableAll:MenuButton;
+	
+	var buttonDisableAllExtra:MenuButton; 
+
 	var buttons:Array<MenuButton> = [];
 	var settingsButton:MenuButton;
 
@@ -108,8 +111,30 @@ class ModsMenuState extends MusicBeatState
 		else
 			daY = 20;
 
-		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + daY, buttonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), reload);
+
+		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + (daY / 2), buttonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), reload);
 		add(buttonReload);
+		
+		buttonDisableAllExtra = new MenuButton(buttonX, buttonReload.y + buttonHeight + 10, buttonWidth, buttonHeight, Language.getPhrase('disable_all_button', 'DISABLE ALL'), function() {
+			buttonDisableAllExtra.ignoreCheck = false;
+			for (mod in modsGroup.members)
+			{
+				if(modsList.enabled.contains(mod.folder))
+				{
+					modsList.enabled.remove(mod.folder);
+					modsList.disabled.push(mod.folder);
+					mod.icon.color = 0xFFFF6666;
+					mod.text.color = FlxColor.GRAY;
+				}
+			}
+			updateModDisplayData();
+			checkToggleButtons();
+			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
+		});
+		buttonDisableAllExtra.bg.color = 0xFFFF0000; // Rojo intenso
+		buttonDisableAllExtra.focusChangeCallback = function(focus:Bool) if(!focus) buttonDisableAllExtra.bg.color = 0xFFFF0000;
+		add(buttonDisableAllExtra);
+
 		
 		var myY = buttonReload.y + buttonReload.bg.height + 20;
 		/*buttonModFolder = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, "MODS FOLDER", function() {
@@ -123,6 +148,7 @@ class ModsMenuState extends MusicBeatState
 		});
 		add(buttonModFolder);*/
 
+	
 		buttonEnableAll = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, Language.getPhrase('enable_all_button', 'ENABLE ALL'), function() {
 			buttonEnableAll.ignoreCheck = false;
 			for (mod in modsGroup.members)
@@ -502,7 +528,7 @@ class ModsMenuState extends MusicBeatState
 						changeSelectedButton();
 					}
 				}
-				else 
+				else 
 				{
 					if(controls.BACK)
 					{
@@ -621,7 +647,8 @@ class ModsMenuState extends MusicBeatState
 		switch(curSelectedButton)
 		{
 			case -2: return buttonReload;
-			case -1: return buttonEnableAll.enabled ? buttonEnableAll : buttonDisableAll;
+	
+			case -1: return buttonDisableAllExtra; 
 		}
 
 		if(modsList.all.length < 1) return buttonReload; //prevent possible crash from my irresponsibility
@@ -642,18 +669,18 @@ class ModsMenuState extends MusicBeatState
 		var lastSelected = curSelectedMod;
 		curSelectedMod += add;
 
-		var limited:Bool = false;
+		
 		if(curSelectedMod < 0)
 		{
-			curSelectedMod = 0;
-			limited = true;
+			curSelectedMod = max;
 		}
 		else if(curSelectedMod > max)
 		{
-			curSelectedMod = max;
-			limited = true;
+			curSelectedMod = 0; 
 		}
 		
+		/* 
+
 		if(!controls.mobileC && !isMouseWheel && limited && Math.abs(add) == 1)
 		{
 			if(add < 0) // pressed up on first mod
@@ -673,6 +700,7 @@ class ModsMenuState extends MusicBeatState
 				return;
 			}
 		}
+		*/
 		
 		holdingMod = false;
 		holdingElapsed = 0;
@@ -906,8 +934,8 @@ class ModItem extends FlxSpriteGroup
 			if(pack.color != null)
 			{
 				this.bgColor = FlxColor.fromRGB(pack.color[0] != null ? pack.color[0] : 170,
-											  pack.color[1] != null ? pack.color[1] : 0,
-											  pack.color[2] != null ? pack.color[2] : 255);
+											  pack.color[1] != null ? pack.color[1] : 0,
+											  pack.color[2] != null ? pack.color[2] : 255);
 			}
 			this.mustRestart = (pack.restart == true);
 		}
