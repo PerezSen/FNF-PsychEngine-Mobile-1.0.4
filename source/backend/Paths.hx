@@ -93,7 +93,6 @@ class Paths
 				var grp:Array<Dynamic> = Reflect.getProperty(spr, 'members');
 				if(grp != null)
 				{
-					//trace('is actually a group');
 					for (member in grp)
 					{
 						checkForGraphics(member);
@@ -102,17 +101,14 @@ class Paths
 				}
 			}
 
-			//trace('check...');
 			try
 			{
 				var gfx:FlxGraphic = Reflect.getProperty(spr, 'graphic');
 				if(gfx != null)
 				{
 					protectedGfx.push(gfx);
-					//trace('gfx added to the list successfully!');
 				}
 			}
-			//catch(haxe.Exception) {}
 		}
 
 		for (member in FlxG.state.members)
@@ -132,7 +128,6 @@ class Paths
 				{
 					destroyGraphic(graphic); // get rid of the graphic
 					currentTrackedAssets.remove(key); // and remove the key from local cache map
-					//trace('deleted $key');
 				}
 			}
 		}
@@ -223,7 +218,6 @@ class Paths
 	{
 		var songKey:String = '${formatToSongPath(song)}/Voices';
 		if(postfix != null) songKey += '-' + postfix;
-		//trace('songKey test: $songKey');
 		return returnSound(songKey, 'songs', modsAllowed, false);
 	}
 
@@ -231,20 +225,34 @@ class Paths
 		return sound(key + FlxG.random.int(min, max), modsAllowed);
 
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
-	static public function image(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxGraphic
+
+	// FIX: image() now includes parentFolder in the cache key to avoid
+	// collisions between assets with the same filename in different folders.
+	// e.g. Paths.image('touchpad/bg', 'mobile') and Paths.image('touchpad/bg')
+	// previously shared the same cache key 'images/touchpad/bg.png' causing
+	// the wrong graphic to be returned silently.
+	public static function image(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxGraphic
 	{
-		key = Language.getFileTranslation('images/$key') + '.png';
-		var bitmap:BitmapData = null;
-		if (currentTrackedAssets.exists(key))
+		var fileKey:String = Language.getFileTranslation('images/$key') + '.png';
+
+		// Build a unique cache key that includes the parentFolder to prevent collisions
+		var cacheKey:String = (parentFolder != null) ? '$parentFolder/$fileKey' : fileKey;
+
+		if (currentTrackedAssets.exists(cacheKey))
 		{
-			localTrackedAssets.push(key);
-			return currentTrackedAssets.get(key);
+			localTrackedAssets.push(cacheKey);
+			return currentTrackedAssets.get(cacheKey);
 		}
-		return cacheBitmap(key, parentFolder, bitmap, allowGPU);
+		return cacheBitmap(fileKey, parentFolder, null, allowGPU, cacheKey);
 	}
 
-	public static function cacheBitmap(key:String, ?parentFolder:String = null, ?bitmap:BitmapData, ?allowGPU:Bool = true):FlxGraphic
+	// FIX: Added optional cacheKey parameter so image() can pass a folder-qualified
+	// key while cacheBitmap still uses the plain fileKey for getPath() resolution.
+	public static function cacheBitmap(key:String, ?parentFolder:String = null, ?bitmap:BitmapData, ?allowGPU:Bool = true, ?cacheKey:String = null):FlxGraphic
 	{
+		// If no explicit cacheKey provided, use the file key (legacy behaviour)
+		if (cacheKey == null) cacheKey = key;
+
 		if (bitmap == null)
 		{
 			var file:String = getPath(key, IMAGE, parentFolder, true);
@@ -256,7 +264,7 @@ class Paths
 
 			if (bitmap == null)
 			{
-				trace('Bitmap not found: $file | key: $key');
+				trace('Bitmap not found: $file | key: $key | parentFolder: $parentFolder');
 				return null;
 			}
 		}
@@ -276,12 +284,12 @@ class Paths
 			bitmap.readable = true;
 		}
 
-		var graph:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, key);
+		var graph:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, cacheKey);
 		graph.persist = true;
 		graph.destroyOnNoUse = false;
 
-		currentTrackedAssets.set(key, graph);
-		localTrackedAssets.push(key);
+		currentTrackedAssets.set(cacheKey, graph);
+		localTrackedAssets.push(cacheKey);
 		return graph;
 	}
 
@@ -363,7 +371,6 @@ class Paths
 	
 	static public function getMultiAtlas(keys:Array<String>, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		
 		var parentFrames:FlxAtlasFrames = Paths.getAtlas(keys[0].trim());
 		if(keys.length > 1)
 		{
@@ -428,7 +435,7 @@ class Paths
 
 	inline static public function formatToSongPath(path:String) {
 		final invalidChars = ~/[~&;:<>#\s]/g;
-		final hideChars = ~/[.,'"%?!]/g;
+		final hideChars = ~/[.,'\"%?!]/g;
 
 		return hideChars.replace(invalidChars.replace(path, '-'), '').trim().toLowerCase();
 	}
@@ -438,7 +445,6 @@ class Paths
 	{
 		var file:String = getPath(Language.getFileTranslation(key) + '.$SOUND_EXT', SOUND, path, modsAllowed);
 
-		//trace('precaching sound: $file');
 		if(!currentTrackedSounds.exists(file))
 		{
 			#if sys
@@ -603,7 +609,6 @@ class Paths
 					spriteJson = getTextFromFile('images/$originalPath/spritemap$st.json');
 					if(spriteJson != null)
 					{
-						//trace('found Sprite Json');
 						changedImage = true;
 						changedAtlasJson = true;
 						folderOrImg = image('$originalPath/spritemap$st');
@@ -612,7 +617,6 @@ class Paths
 				}
 				else if(fileExists('images/$originalPath/spritemap$st.png', IMAGE))
 				{
-					//trace('found Sprite PNG');
 					changedImage = true;
 					folderOrImg = image('$originalPath/spritemap$st');
 					break;
@@ -621,29 +625,54 @@ class Paths
 
 			if(!changedImage)
 			{
-				//trace('Changing folderOrImg to FlxGraphic');
 				changedImage = true;
 				folderOrImg = image(originalPath);
 			}
 
 			if(!changedAnimJson)
 			{
-				//trace('found Animation Json');
 				changedAnimJson = true;
 				animationJson = getTextFromFile('images/$originalPath/Animation.json');
 			}
 		}
 
-		//trace(folderOrImg);
-		//trace(spriteJson);
-		//trace(animationJson);
 		spr.loadAtlasEx(folderOrImg, spriteJson, animationJson);
 	}
 	#end
 
+	// FIX: On Android, assets packed inside the APK are not accessible via
+	// FileSystem.readDirectory() even with MODS_ALLOWED defined. We detect
+	// this case and fall back to OpenFL's Assets.list() which reads from
+	// the APK bundle correctly. This fixes DPadModes, ActionModes, fonts,
+	// shaders, characters, stages, and any other shared asset directory
+	// that was silently returning an empty list on Android.
 	public static function readDirectory(directory:String):Array<String>
 	{
 		#if MODS_ALLOWED
+		// On Android, relative paths inside the APK are NOT accessible via
+		// FileSystem. Only absolute paths (external storage / mods folder) are.
+		// Detect by checking if it's an absolute path or starts with "assets/".
+		#if android
+		var isApkPath:Bool = !haxe.io.Path.isAbsolute(directory);
+		if (isApkPath)
+		{
+			// Fall back to OpenFL Assets.list() which reads the APK bundle
+			var prefix:String = directory.endsWith('/') ? directory : directory + '/';
+			var listed:Array<String> = [];
+			for (entry in openfl.utils.Assets.list())
+			{
+				if (entry.startsWith(prefix))
+				{
+					// Get the immediate child name (not nested subdirs)
+					var relative:String = entry.substr(prefix.length);
+					var childName:String = relative.split('/')[0];
+					if (childName.length > 0 && !listed.contains(childName))
+						listed.push(childName);
+				}
+			}
+			return listed;
+		}
+		#end
 		return FileSystem.readDirectory(directory);
 		#else
 		var dirs:Array<String> = [];
