@@ -506,7 +506,7 @@ class ModsMenuState extends MusicBeatState
 						}
 						
 					}
-					else if(FlxG.mouse.justReleased && !controls.mobileC && holdingMod)
+					if(FlxG.mouse.justReleased && !controls.mobileC && holdingMod)
 					{
 						holdingMod = false;
 						holdingElapsed = 0;
